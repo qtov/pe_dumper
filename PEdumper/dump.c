@@ -2,6 +2,10 @@
 #include "pe_status.h"
 #include "data_directory.h"
 
+#ifdef PE_DEBUG
+	#include <stdio.h>
+#endif
+
 DWORD va2pa(_In_ DWORD address, _In_ IMAGE_SECTION_HEADER *_section_header, _In_ IMAGE_FILE_HEADER *file_header, _In_ BYTE *mapped_file)
 {
 	WORD i = 0;
@@ -14,7 +18,8 @@ DWORD va2pa(_In_ DWORD address, _In_ IMAGE_SECTION_HEADER *_section_header, _In_
 
 	for (i = 0; i < file_header->NumberOfSections; i++)
 	{
-		if ((section_header->VirtualAddress <= address) && (address < (section_header->VirtualAddress + section_header->Misc.VirtualSize)))
+		if ((section_header->VirtualAddress <= address) && (address < (section_header->VirtualAddress + \
+			((section_header->Misc.VirtualSize == 0) ? section_header->SizeOfRawData : section_header->Misc.VirtualSize))))
 		{
 			break;
 		}
@@ -60,21 +65,15 @@ PE_STATUS dump_dos_header(_In_ IMAGE_DOS_HEADER *dos_header, _In_ WIN32_FIND_DAT
 {
 	PE_STATUS ret = PE_STATUS_SUCCESS;
 
-	if (printf("\t%c%c -> e_magic\n", *((BYTE *)&dos_header->e_magic), *(((BYTE *)&dos_header->e_magic) + 1)) < 0)
-	{
-		ret |= PE_STATUS_PRINTF_ERROR;
-	}
+	printf("\t%c%c -> e_magic\n", *((BYTE *)&dos_header->e_magic), *(((BYTE *)&dos_header->e_magic) + 1));
 
 	if (dos_header->e_magic != 0x5a4d) // aka "MZ"
 	{
 		ret |= PE_STATUS_MZ_MAGIC_INVALID;
 	}
 
-	if (printf("\t%#010x -> e_lfanew\n", dos_header->e_lfanew) < 0)
-	{
-		ret |= PE_STATUS_PRINTF_ERROR;
-	}
-
+	printf("\t%#010x -> e_lfanew\n", dos_header->e_lfanew);
+	
 	if (dos_header->e_lfanew >= (abs(file_data->nFileSizeLow - file_data->nFileSizeHigh)))
 	{
 		ret |= PE_STATUS_LFANEW_OUT_OF_BOUNDS;
@@ -148,7 +147,9 @@ PE_STATUS dump_section(_In_ IMAGE_SECTION_HEADER *section_header, _In_ DWORD *im
 	printf("\t\tImageBase: %#x\n", *image_base);
 	printf("\t\tRVA: %#x\n", section_header->VirtualAddress);
 	printf("\t\tVA: %#x\n", section_header->VirtualAddress + *image_base);
-	printf("\t\tsize: %#x\n", section_header->SizeOfRawData);
+	printf("\t\tRawSize: %#x\n", section_header->SizeOfRawData);
+	printf("\t\tRawPointer: %#X\n", section_header->PointerToRawData);
+	printf("\t\tVirtualSize: %#X\n", section_header->Misc.VirtualSize);
 
 	return ret;
 }
@@ -161,7 +162,7 @@ PE_STATUS dump_export_directory_functions(_In_ IMAGE_EXPORT_DIRECTORY *export_di
 	DWORD *a_names = (DWORD *)va2pa(export_directory->AddressOfNames, section_header, file_header, mapped_file);
 	WORD *a_name_ordinals = (WORD *)va2pa(export_directory->AddressOfNameOrdinals, section_header, file_header, mapped_file);
 	DWORD *a_functions = (DWORD *)va2pa(export_directory->AddressOfFunctions, section_header, file_header, mapped_file);
-	IMAGE_OPTIONAL_HEADER *optional_header = (IMAGE_OPTIONAL_HEADER *)((BYTE *)file_header) + sizeof(IMAGE_FILE_HEADER);
+	IMAGE_OPTIONAL_HEADER *optional_header = (IMAGE_OPTIONAL_HEADER *)(((BYTE *)file_header) + sizeof(IMAGE_FILE_HEADER));
 	
 	if (export_directory->NumberOfFunctions == 0 && export_directory->NumberOfNames == 0)
 	{
@@ -213,6 +214,8 @@ PE_STATUS dump_export_directory_functions(_In_ IMAGE_EXPORT_DIRECTORY *export_di
 			printf("\t\t\tVA:  %#x\n", a_functions[i] + optional_header->ImageBase);
 		}
 	}
+
+	free(apparitions_functions);
 
 	return ret;
 }
@@ -463,7 +466,12 @@ void dump_current_directory_files(_In_ char filename[], _In_ TCHAR current_direc
 	WIN32_FIND_DATA file_data;
 	BOOL next;
 
-	SetCurrentDirectory(current_directory);
+	BOOL set_directory_return = SetCurrentDirectory(current_directory);
+
+	if (set_directory_return == 0)
+	{
+		return;
+	}
 
 	file_find = FindFirstFile(
 		filename,
@@ -471,13 +479,26 @@ void dump_current_directory_files(_In_ char filename[], _In_ TCHAR current_direc
 	);
 
 	printf("\n\n");
-	printf("%s:\n", current_directory);
+	printf("%s\\\n", current_directory);
+
+#ifdef PE_DEBUG_DIRECTORY
+
+	char debug_directory[4096];
+	fgets(debug_directory, 4096, stdin);
+
+#endif
+
 	printf(LINE_BREAKER);
 
 	if (file_find != INVALID_HANDLE_VALUE)
 	{
 		do
 		{
+			if (file_data.dwFileAttributes == FILE_ATTRIBUTE_DIRECTORY)
+			{
+				goto next;
+			}
+
 			file = CreateFile(
 				file_data.cFileName,
 				GENERIC_READ,
@@ -488,7 +509,8 @@ void dump_current_directory_files(_In_ char filename[], _In_ TCHAR current_direc
 				NULL
 			);
 
-			if (GetLastError() == ERROR_FILE_NOT_FOUND)
+			DWORD err = GetLastError();
+			if (err == ERROR_FILE_NOT_FOUND)
 			{
 				goto next;
 			}
