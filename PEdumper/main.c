@@ -16,11 +16,6 @@ int main(int argc, char* argv[])
 	TCHAR current_directory[4096] = { 0 };
 	TCHAR file_name[4096] = { 0 };
 
-	//GetCurrentDirectory(
-	//	4096,
-	//	current_directory
-	//);
-
 	if ((status = get_directory_name(current_directory, argv[1])) != PE_STATUS_SUCCESS)
 	{
 		goto cleanup;

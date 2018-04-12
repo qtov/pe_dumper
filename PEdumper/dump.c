@@ -29,6 +29,9 @@ DWORD va2pa(_In_ DWORD address, _In_ IMAGE_SECTION_HEADER *_section_header, _In_
 	return (DWORD)(mapped_file + section_header->PointerToRawData + (address - section_header->VirtualAddress));
 }
 
+/*
+* Maps the file into memory and returns the void pointer to the start of the mapped area.
+*/
 LPVOID map_file(_In_ HANDLE file)
 {
 	LPVOID void_data;
@@ -51,6 +54,8 @@ LPVOID map_file(_In_ HANDLE file)
 			0,
 			0
 		);
+
+		CloseHandle(mapped_file);
 
 		if (void_data != NULL)
 		{
@@ -104,7 +109,7 @@ PE_STATUS dump_file_header(_In_ IMAGE_FILE_HEADER *file_header)
 
 	printf("\t\t%#x -> Machine\n", file_header->Machine);
 
-	if (file_header->Machine != IMAGE_FILE_MACHINE_I386) // aka 0x14c
+	if (file_header->Machine != IMAGE_FILE_MACHINE_I386) // aka 0x14c for 32 bit 0x8664 64bit
 	{
 		ret |= PE_STATUS_NOT_32BIT_ONLY_EXE;
 	}
@@ -440,7 +445,7 @@ void recurse_dump_current_directory_files(_In_ char filename[], _In_ TCHAR curre
 
 	do
 	{
-		if (file_data->dwFileAttributes == FILE_ATTRIBUTE_DIRECTORY\
+		if (file_data->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY\
 			&& strcmp(file_data->cFileName, ".")\
 			&& strcmp(file_data->cFileName, ".."))
 		{
@@ -457,6 +462,8 @@ void recurse_dump_current_directory_files(_In_ char filename[], _In_ TCHAR curre
 			file_data
 		);
 	} while (next);
+
+	FindClose(file_find);
 }
 
 void dump_current_directory_files(_In_ char filename[], _In_ TCHAR current_directory[], _In_ BOOL recursive)
@@ -539,6 +546,8 @@ void dump_current_directory_files(_In_ char filename[], _In_ TCHAR current_direc
 				&file_data
 			);
 		} while (next);
+
+		FindClose(file_find);
 	}
 
 	if (recursive)

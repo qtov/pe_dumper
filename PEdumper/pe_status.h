@@ -1,6 +1,6 @@
 #pragma once
 
-#define PE_DEBUG
+//#define PE_DEBUG
 //#define PE_DEBUG_DIRECTORY
 
 typedef enum
