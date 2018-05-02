@@ -1,0 +1,4 @@
+#pragma once
+
+#define DATA_DIRECTORY_EXPORT 0
+#define DATA_DIRECTORY_IMPORT 1
