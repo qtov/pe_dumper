@@ -25,4 +25,4 @@ PE_STATUS get_directory_name(_Out_ TCHAR directory_name[], _In_ TCHAR original_n
 PE_STATUS get_file_name(_Out_ TCHAR file_name[], _In_ TCHAR original_name[]);
 PE_STATUS path_append(_Inout_ TCHAR original[], _In_ DWORD max_len, _In_ TCHAR to_copy[]);
 TCHAR* path_to_filename(_In_ TCHAR* pathname, _In_ DWORD length);
-PE_STATUS write_in_file(_In_ BOOL bool_write, _Inout_ WRITE_FILE_INFO* wf, _In_ char format[], ...);
+PE_STATUS write_in_file(_Inout_ WRITE_FILE_INFO* wf, _In_ char format[], ...);

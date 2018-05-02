@@ -68,14 +68,14 @@ PE_STATUS dump_dos_header(_In_ IMAGE_DOS_HEADER *dos_header, _In_ WIN32_FIND_DAT
 {
 	PE_STATUS status = PE_STATUS_SUCCESS;
 
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-15s: %c%c\n", "e_magic", *((BYTE *)&dos_header->e_magic), *(((BYTE *)&dos_header->e_magic) + 1)));
+	PE_CHECK(write_in_file(wf, "\t%-15s: %c%c\n", "e_magic", *((BYTE *)&dos_header->e_magic), *(((BYTE *)&dos_header->e_magic) + 1)));
 
 	if (dos_header->e_magic != 0x5a4d) // aka "MZ"
 	{
 		status |= PE_STATUS_MZ_MAGIC_INVALID;
 	}
 
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-15s: %#x\n", "e_lfanew", dos_header->e_lfanew));
+	PE_CHECK(write_in_file(wf, "\t%-15s: %#x\n", "e_lfanew", dos_header->e_lfanew));
 	
 	if ((DWORD)dos_header->e_lfanew >= (DWORD)(abs(file_data->nFileSizeLow - file_data->nFileSizeHigh)))
 	{
@@ -106,7 +106,7 @@ PE_STATUS dump_nt_signature(_In_ IMAGE_NT_HEADERS *nt_headers, _Inout_ WRITE_FIL
 			return PE_STATUS_NT_SIGNATURE_INVALID;
 		}
 
-		PE_CHECK(write_in_file(FALSE, wf, "\t%-15s: %s\n", "NT Signature", ((char *)&(nt_headers->Signature))));
+		PE_CHECK(write_in_file(wf, "\t%-15s: %s\n", "NT Signature", ((char *)&(nt_headers->Signature))));
 	}
 
 cleanup:
@@ -117,16 +117,16 @@ PE_STATUS dump_file_header(_In_ IMAGE_FILE_HEADER *file_header, _Inout_ WRITE_FI
 {
 	PE_STATUS status = PE_STATUS_SUCCESS;
 
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-20s: %#x\n", "Machine", file_header->Machine));
+	PE_CHECK(write_in_file(wf, "\t\t%-20s: %#x\n", "Machine", file_header->Machine));
 
 	if (file_header->Machine != IMAGE_FILE_MACHINE_I386) // aka 0x14c for 32 bit 0x8664 64bit
 	{
 		status |= PE_STATUS_NOT_32BIT_ONLY_EXE;
 	}
 
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-20s: %d\n", "NumberOfSections", file_header->NumberOfSections));
+	PE_CHECK(write_in_file(wf, "\t\t%-20s: %d\n", "NumberOfSections", file_header->NumberOfSections));
 
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-20s: %#x\n", "Characteristics", file_header->Characteristics));
+	PE_CHECK(write_in_file(wf, "\t\t%-20s: %#x\n", "Characteristics", file_header->Characteristics));
 
 	if (file_header->Characteristics == 0)
 	{
@@ -141,16 +141,16 @@ PE_STATUS dump_optional_header(_In_ IMAGE_OPTIONAL_HEADER *optional_header, _Ino
 {
 	PE_STATUS status = PE_STATUS_SUCCESS;
 
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-20s: %#x\n", "Magic", optional_header->Magic));
+	PE_CHECK(write_in_file(wf, "\t\t%-20s: %#x\n", "Magic", optional_header->Magic));
 	if (optional_header->Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC)
 	{
 		status |= PE_STATUS_OPTIONAL_HEADER_INVALID_SIGNATURE;
 	}
 
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-20s: %#x\n", "BaseOfCode", optional_header->BaseOfCode));
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-20s: %#x\n", "BaseOfData", optional_header->BaseOfData));
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-20s: %#x\n", "ImageBase", optional_header->ImageBase));
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-20s: %d\n", "NumberOfRvaAndSizes", optional_header->NumberOfRvaAndSizes));
+	PE_CHECK(write_in_file(wf, "\t\t%-20s: %#x\n", "BaseOfCode", optional_header->BaseOfCode));
+	PE_CHECK(write_in_file(wf, "\t\t%-20s: %#x\n", "BaseOfData", optional_header->BaseOfData));
+	PE_CHECK(write_in_file(wf, "\t\t%-20s: %#x\n", "ImageBase", optional_header->ImageBase));
+	PE_CHECK(write_in_file(wf, "\t\t%-20s: %d\n", "NumberOfRvaAndSizes", optional_header->NumberOfRvaAndSizes));
 
 cleanup:
 	return status;
@@ -159,32 +159,19 @@ cleanup:
 PE_STATUS dump_section(_In_ IMAGE_SECTION_HEADER *section_header, _In_ DWORD *image_base, _Inout_ WRITE_FILE_INFO *wf)
 {
 	PE_STATUS status = PE_STATUS_SUCCESS;
-	
-	__try
-	{
-		if (strlen((char *)section_header->Name) > IMAGE_SIZEOF_SHORT_NAME)
-		{
-			return PE_STATUS_INVALID_SECTION_NAME;
-		}
 
-		if (strcmp((char *)section_header->Name, ".Adson") == 0)
-		{
-			return PE_STATUS_SCAN_VIRUS;
-		}
-
-		PE_CHECK(write_in_file(FALSE, wf, "\t%s\n", section_header->Name));
-	}
-	__except(EXCEPTION_EXECUTE_HANDLER)
+	if (strlen((char *)section_header->Name) > IMAGE_SIZEOF_SHORT_NAME)
 	{
 		return PE_STATUS_INVALID_SECTION_NAME;
 	}
 
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-12s: %#x\n", "ImageBase", *image_base));
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-12s: %#x\n", "RVA", section_header->VirtualAddress));
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-12s: %#x\n", "VA", section_header->VirtualAddress + *image_base));
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-12s: %#x\n", "RawSize", section_header->SizeOfRawData));
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-12s: %#X\n", "RawPointer", section_header->PointerToRawData));
-	PE_CHECK(write_in_file(FALSE, wf, "\t\t%-12s: %#X\n", "VirtualSize", section_header->Misc.VirtualSize));
+	PE_CHECK(write_in_file(wf, "\t%s\n", section_header->Name));
+	PE_CHECK(write_in_file(wf, "\t\t%-12s: %#x\n", "ImageBase", *image_base));
+	PE_CHECK(write_in_file(wf, "\t\t%-12s: %#x\n", "RVA", section_header->VirtualAddress));
+	PE_CHECK(write_in_file(wf, "\t\t%-12s: %#x\n", "VA", section_header->VirtualAddress + *image_base));
+	PE_CHECK(write_in_file(wf, "\t\t%-12s: %#x\n", "RawSize", section_header->SizeOfRawData));
+	PE_CHECK(write_in_file(wf, "\t\t%-12s: %#X\n", "RawPointer", section_header->PointerToRawData));
+	PE_CHECK(write_in_file(wf, "\t\t%-12s: %#X\n", "VirtualSize", section_header->Misc.VirtualSize));
 
 cleanup:
 	return status;
@@ -203,7 +190,7 @@ PE_STATUS dump_export_directory_functions(_In_ IMAGE_EXPORT_DIRECTORY *export_di
 	
 	if (export_directory->NumberOfFunctions == 0 && export_directory->NumberOfNames == 0)
 	{
-		status = write_in_file(FALSE, wf, "\tNo functions exported.\n");
+		status = write_in_file(wf, "\tNo functions exported.\n");
 
 		return status;
 	}
@@ -217,7 +204,7 @@ PE_STATUS dump_export_directory_functions(_In_ IMAGE_EXPORT_DIRECTORY *export_di
 		apparitions_functions[i] = FALSE;
 	}
 
-	PE_CHECK(write_in_file(FALSE, wf, "\n\tExported functions:\n"));
+	PE_CHECK(write_in_file(wf, "\n\tExported functions:\n"));
 
 	for (i = 0; i < export_directory->NumberOfNames; ++i)
 	{
@@ -234,21 +221,21 @@ PE_STATUS dump_export_directory_functions(_In_ IMAGE_EXPORT_DIRECTORY *export_di
 			return PE_STATUS_INVALID_EXPORT_DIRECTORY;
 		}
 
-		PE_CHECK(write_in_file(FALSE, wf, "\t\tFunction: %s\n", (char *)a_name));
-		PE_CHECK(write_in_file(FALSE, wf, "\t\t\tName ordinal: %d\n", a_name_ordinal));
+		PE_CHECK(write_in_file(wf, "\t\tFunction: %s\n", (char *)a_name));
+		PE_CHECK(write_in_file(wf, "\t\t\tName ordinal: %d\n", a_name_ordinal));
 
 		if (a_name_ordinal < export_directory->NumberOfFunctions)
 		{
 			DWORD a_function = a_functions[a_name_ordinal];
 
-			PE_CHECK(write_in_file(FALSE, wf, "\t\t\tRVA: %#x\n", a_function));
-			PE_CHECK(write_in_file(FALSE, wf, "\t\t\tVA:  %#x\n", a_function + optional_header->ImageBase));
+			PE_CHECK(write_in_file(wf, "\t\t\tRVA: %#x\n", a_function));
+			PE_CHECK(write_in_file(wf, "\t\t\tVA:  %#x\n", a_function + optional_header->ImageBase));
 
 			apparitions_functions[a_name_ordinal] = TRUE;
 		}
 		else
 		{
-			PE_CHECK(write_in_file(FALSE, wf, "\t\t\tNo function associated.\n"));
+			PE_CHECK(write_in_file(wf, "\t\t\tNo function associated.\n"));
 		}
 	}
 
@@ -257,9 +244,9 @@ PE_STATUS dump_export_directory_functions(_In_ IMAGE_EXPORT_DIRECTORY *export_di
 	{
 		if (!apparitions_functions[i])
 		{
-			PE_CHECK(write_in_file(FALSE, wf, "\t\tFunction: (NO NAME)\n"));
-			PE_CHECK(write_in_file(FALSE, wf, "\t\t\tRVA: %#x\n", a_functions[i]));
-			PE_CHECK(write_in_file(FALSE, wf, "\t\t\tVA:  %#x\n", a_functions[i] + optional_header->ImageBase));
+			PE_CHECK(write_in_file(wf, "\t\tFunction: (NO NAME)\n"));
+			PE_CHECK(write_in_file(wf, "\t\t\tRVA: %#x\n", a_functions[i]));
+			PE_CHECK(write_in_file(wf, "\t\t\tVA:  %#x\n", a_functions[i] + optional_header->ImageBase));
 		}
 	}
 
@@ -280,24 +267,24 @@ PE_STATUS dump_export_directory(_In_ IMAGE_EXPORT_DIRECTORY *export_directory, _
 	// WAY better than IsBadReadPtr
 	__try
 	{
-		PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %s\n", "Name", name_p));
+		PE_CHECK(write_in_file(wf, "\t%-22s: %s\n", "Name", name_p));
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
-		PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %#x\n", "Name", export_directory->Name));
+		PE_CHECK(write_in_file(wf, "\t%-22s: %#x\n", "Name", export_directory->Name));
 	}
 
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %#x\n", "Characteristics", export_directory->Characteristics));
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %d\n", "TimeDateStamp", export_directory->TimeDateStamp));
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %d\n", "MajorVersion", export_directory->MajorVersion));
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %d\n", "MinorVersion", export_directory->MinorVersion));
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %d\n", "Base", export_directory->Base));
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %d\n", "MinorVersion", export_directory->MinorVersion));
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %d\n", "NumberOfFunctions", export_directory->NumberOfFunctions));
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %d\n", "NumberOfNames", export_directory->NumberOfNames));
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %#x\n", "AddressOfFunctions", export_directory->AddressOfFunctions));
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %#x\n", "AddressOfNames", (DWORD)export_directory->AddressOfNames));
-	PE_CHECK(write_in_file(FALSE, wf, "\t%-22s: %#x\n", "AddressOfNameOrdinals", export_directory->AddressOfNameOrdinals));
+	PE_CHECK(write_in_file(wf, "\t%-22s: %#x\n", "Characteristics", export_directory->Characteristics));
+	PE_CHECK(write_in_file(wf, "\t%-22s: %d\n", "TimeDateStamp", export_directory->TimeDateStamp));
+	PE_CHECK(write_in_file(wf, "\t%-22s: %d\n", "MajorVersion", export_directory->MajorVersion));
+	PE_CHECK(write_in_file(wf, "\t%-22s: %d\n", "MinorVersion", export_directory->MinorVersion));
+	PE_CHECK(write_in_file(wf, "\t%-22s: %d\n", "Base", export_directory->Base));
+	PE_CHECK(write_in_file(wf, "\t%-22s: %d\n", "MinorVersion", export_directory->MinorVersion));
+	PE_CHECK(write_in_file(wf, "\t%-22s: %d\n", "NumberOfFunctions", export_directory->NumberOfFunctions));
+	PE_CHECK(write_in_file(wf, "\t%-22s: %d\n", "NumberOfNames", export_directory->NumberOfNames));
+	PE_CHECK(write_in_file(wf, "\t%-22s: %#x\n", "AddressOfFunctions", export_directory->AddressOfFunctions));
+	PE_CHECK(write_in_file(wf, "\t%-22s: %#x\n", "AddressOfNames", (DWORD)export_directory->AddressOfNames));
+	PE_CHECK(write_in_file(wf, "\t%-22s: %#x\n", "AddressOfNameOrdinals", export_directory->AddressOfNameOrdinals));
 	
 	status |= dump_export_directory_functions(export_directory, section_header, file_header, mapped_file, wf);
 
@@ -323,12 +310,12 @@ PE_STATUS dump_import_descriptor_functions(_In_ IMAGE_IMPORT_DESCRIPTOR *import_
 
 			if (*((DWORD *)original_first_thunk) & IMAGE_ORDINAL_FLAG32)
 			{
-				PE_CHECK(write_in_file(FALSE, wf, "\t\t\t%-13s: %d %#x\n", "FunctionOrd",\
+				PE_CHECK(write_in_file(wf, "\t\t\t%-13s: %d %#x\n", "FunctionOrd",\
 					*((DWORD *)original_first_thunk) ^ IMAGE_ORDINAL_FLAG32, *((DWORD *)original_first_thunk) ^ IMAGE_ORDINAL_FLAG32));
 			}
 			else
 			{
-				PE_CHECK(write_in_file(FALSE, wf, "\t\t\t%-13s: %s\n", "FunctionName", (char *)import_by_name->Name));
+				PE_CHECK(write_in_file(wf, "\t\t\t%-13s: %s\n", "FunctionName", (char *)import_by_name->Name));
 			}
 
 			++original_first_thunk;
@@ -338,13 +325,13 @@ PE_STATUS dump_import_descriptor_functions(_In_ IMAGE_IMPORT_DESCRIPTOR *import_
 	{
 		while (*((DWORD *)first_thunk) != 0)
 		{
-			PE_CHECK(write_in_file(FALSE, wf, "\t\t\t%-13s: %#x\n", "FunctionRVA", *((DWORD *)first_thunk)));
+			PE_CHECK(write_in_file(wf, "\t\t\t%-13s: %#x\n", "FunctionRVA", *((DWORD *)first_thunk)));
 			++first_thunk;
 		}
 	}
 	else
 	{
-		PE_CHECK(write_in_file(FALSE, wf, "\t\t\tNo imports.\n"));
+		PE_CHECK(write_in_file(wf, "\t\t\tNo imports.\n"));
 	}
 
 cleanup:
@@ -365,7 +352,7 @@ PE_STATUS dump_import_descriptor(_In_ IMAGE_IMPORT_DESCRIPTOR *import_descriptor
 
 		__try
 		{
-			PE_CHECK(write_in_file(FALSE, wf, "\t%-20s: %s\n", "Name", name));
+			PE_CHECK(write_in_file(wf, "\t%-20s: %s\n", "Name", name));
 		}
 		__except (EXCEPTION_EXECUTE_HANDLER)
 		{
@@ -373,14 +360,14 @@ PE_STATUS dump_import_descriptor(_In_ IMAGE_IMPORT_DESCRIPTOR *import_descriptor
 			goto cleanup;
 		}
 
-		PE_CHECK(write_in_file(FALSE, wf, "\t%-20s: %#x\n", "OriginalFirstThunk", imp_desc->OriginalFirstThunk));
-		PE_CHECK(write_in_file(FALSE, wf, "\t%-20s: %d\n", "TimeDateStamp", imp_desc->TimeDateStamp));
-		PE_CHECK(write_in_file(FALSE, wf, "\t%-20s: %#x\n", "ForwarderChain", imp_desc->ForwarderChain));
-		PE_CHECK(write_in_file(FALSE, wf, "\t%-20s: %#x\n", "FirstThunk", imp_desc->FirstThunk));
+		PE_CHECK(write_in_file(wf, "\t%-20s: %#x\n", "OriginalFirstThunk", imp_desc->OriginalFirstThunk));
+		PE_CHECK(write_in_file(wf, "\t%-20s: %d\n", "TimeDateStamp", imp_desc->TimeDateStamp));
+		PE_CHECK(write_in_file(wf, "\t%-20s: %#x\n", "ForwarderChain", imp_desc->ForwarderChain));
+		PE_CHECK(write_in_file(wf, "\t%-20s: %#x\n", "FirstThunk", imp_desc->FirstThunk));
 
 		dump_import_descriptor_functions(imp_desc, section_header, file_header, mapped_file, wf);
 
-		PE_CHECK(write_in_file(FALSE, wf, "\n"));
+		PE_CHECK(write_in_file(wf, "\n"));
 
 		++imp_desc;
 	}
@@ -389,7 +376,7 @@ cleanup:
 	return status;
 }
 
-PE_STATUS dump_file(_In_ LPVOID mapped_file, _In_ WIN32_FIND_DATA file_data, _In_ HANDLE log_file, _In_ char directoryname[])
+PE_STATUS dump_file(_In_ LPVOID mapped_file, _In_ WIN32_FIND_DATA file_data, _In_ HANDLE log_file)
 {
 	PE_STATUS status = PE_STATUS_SUCCESS;
 	IMAGE_DOS_HEADER *dos_header;
@@ -415,19 +402,19 @@ PE_STATUS dump_file(_In_ LPVOID mapped_file, _In_ WIN32_FIND_DATA file_data, _In
 	//Dumping DOS header
 	dos_header = (IMAGE_DOS_HEADER *)mapped_file;
 
-	PE_CHECK(write_in_file(FALSE, &wf, "%s", "DOS header:\n"));
+	PE_CHECK(write_in_file(&wf, "%s", "DOS header:\n"));
 
 	PE_CHECK(dump_dos_header(dos_header, &file_data, &wf));
 
 
 	//Dumping NT headers
-	PE_CHECK(write_in_file(FALSE, &wf, "%s", "\nNT Headers:\n"));
+	PE_CHECK(write_in_file(&wf, "%s", "\nNT Headers:\n"));
 
 	nt_headers = (IMAGE_NT_HEADERS *)((BYTE *)mapped_file + dos_header->e_lfanew);
 
 	PE_CHECK(dump_nt_signature(nt_headers, &wf));
 
-	PE_CHECK(write_in_file(FALSE, &wf, "%s", "\tFile Header:\n"));
+	PE_CHECK(write_in_file(&wf, "%s", "\tFile Header:\n"));
 
 
 	//Dumping File header
@@ -439,7 +426,7 @@ PE_STATUS dump_file(_In_ LPVOID mapped_file, _In_ WIN32_FIND_DATA file_data, _In
 	//Dumping optional header
 	optional_header = (IMAGE_OPTIONAL_HEADER *)&(nt_headers->OptionalHeader);
 
-	PE_CHECK(write_in_file(FALSE, &wf, "%s", "\tOptional header:\n"));
+	PE_CHECK(write_in_file(&wf, "%s", "\tOptional header:\n"));
 	
 	PE_CHECK(dump_optional_header(optional_header, &wf));
 
@@ -447,7 +434,7 @@ PE_STATUS dump_file(_In_ LPVOID mapped_file, _In_ WIN32_FIND_DATA file_data, _In
 	//Dumping section header
 	section_header = (IMAGE_SECTION_HEADER *)(((BYTE *)mapped_file) + dos_header->e_lfanew + sizeof(IMAGE_NT_HEADERS));
 
-	PE_CHECK(write_in_file(FALSE, &wf, "%s", "\nSections:\n"));
+	PE_CHECK(write_in_file(&wf, "%s", "\nSections:\n"));
 
 	for (WORD i = 0; i < file_header->NumberOfSections; ++i)
 	{
@@ -460,7 +447,7 @@ PE_STATUS dump_file(_In_ LPVOID mapped_file, _In_ WIN32_FIND_DATA file_data, _In
 
 	export_directory = (IMAGE_EXPORT_DIRECTORY *)(va2pa(data_directory[DATA_DIRECTORY_EXPORT].VirtualAddress, section_header, file_header, mapped_file));
 
-	PE_CHECK(write_in_file(FALSE, &wf, "%s", "\nExport Directory:\n"));
+	PE_CHECK(write_in_file(&wf, "%s", "\nExport Directory:\n"));
 
 	if ((DWORD)export_directory <= (DWORD)mapped_file || \
 		(DWORD)export_directory >= (DWORD)mapped_file + abs(file_data.nFileSizeHigh - file_data.nFileSizeLow) - sizeof(IMAGE_IMPORT_DESCRIPTOR))
@@ -471,7 +458,7 @@ PE_STATUS dump_file(_In_ LPVOID mapped_file, _In_ WIN32_FIND_DATA file_data, _In
 
 	if (!export_directory)
 	{
-		PE_CHECK(write_in_file(FALSE, &wf, "%s", "\tNo exports.\n"));
+		PE_CHECK(write_in_file(&wf, "%s", "\tNo exports.\n"));
 	}
 	else
 	{
@@ -482,7 +469,7 @@ PE_STATUS dump_file(_In_ LPVOID mapped_file, _In_ WIN32_FIND_DATA file_data, _In
 	//Dumping import descriptor
 	import_descriptor = (IMAGE_IMPORT_DESCRIPTOR *)(va2pa(data_directory[DATA_DIRECTORY_IMPORT].VirtualAddress, section_header, file_header, mapped_file));
 
-	PE_CHECK(write_in_file(FALSE, &wf, "%s", "\nImport Descriptor:\n"));
+	PE_CHECK(write_in_file(&wf, "%s", "\nImport Descriptor:\n"));
 
 	if ((DWORD)import_descriptor <= (DWORD)mapped_file ||\
 		(DWORD)import_descriptor >= (DWORD)mapped_file + abs(file_data.nFileSizeHigh - file_data.nFileSizeLow))
@@ -493,7 +480,7 @@ PE_STATUS dump_file(_In_ LPVOID mapped_file, _In_ WIN32_FIND_DATA file_data, _In
 
 	if (!import_descriptor)
 	{
-		PE_CHECK(write_in_file(FALSE, &wf, "%s", "\tNo imports.\n"));
+		PE_CHECK(write_in_file(&wf, "%s", "\tNo imports.\n"));
 	}
 	else
 	{
@@ -503,56 +490,51 @@ PE_STATUS dump_file(_In_ LPVOID mapped_file, _In_ WIN32_FIND_DATA file_data, _In
 cleanup:
 	if (status & PE_STATUS_MZ_MAGIC_INVALID)
 	{
-		status |= write_in_file(FALSE, &wf, "%s", "error: dos magic is not MZ\n");
+		status |= write_in_file(&wf, "%s", "error: dos magic is not MZ\n");
 	}
 
 	if (status & PE_STATUS_LFANEW_OUT_OF_BOUNDS)
 	{
-		status |= write_in_file(FALSE, &wf, "%s", "error: lfanew out of bounds.\n");
+		status |= write_in_file(&wf, "%s", "error: lfanew out of bounds.\n");
 	}
 
 	if (status & PE_STATUS_NT_SIGNATURE_INVALID)
 	{
-		status |= write_in_file(FALSE, &wf, "%s", "error: PE\\0\\0 signature missing.\n");
+		status |= write_in_file(&wf, "%s", "error: PE\\0\\0 signature missing.\n");
 	}
 
 	if (status & PE_STATUS_NOT_32BIT_ONLY_EXE)
 	{
-		status |= write_in_file(FALSE, &wf, "%s", "error: not a 32 bit ONLY exe.\n");
+		status |= write_in_file(&wf, "%s", "error: not a 32 bit ONLY exe.\n");
 	}
 
 	if (status & PE_STATUS_INVALID_CHARACTERISTICS)
 	{
-		status |= write_in_file(FALSE, &wf, "%s", "error: characteristics invalid.\n");
+		status |= write_in_file(&wf, "%s", "error: characteristics invalid.\n");
 	}
 
 	if (status & PE_STATUS_OPTIONAL_HEADER_INVALID_SIGNATURE)
 	{
-		status |= write_in_file(FALSE, &wf, "%s", "error: not a 32 bit magic.\n");
+		status |= write_in_file(&wf, "%s", "error: not a 32 bit magic.\n");
 	}
 
-	if (status & PE_STATUS_SCAN_VIRUS)
+	if (status != 0)
 	{
-		status |= write_in_file(TRUE, &wf, "%s\\%s : %s\n", directoryname, file_data.cFileName, "infected Virus:Win32/Adson");
-		printf("%s\\%s : %s\n", directoryname, file_data.cFileName, "infected Virus:Win32/Adson");
-	}
-	else
-	{
-		status |= write_in_file(TRUE, &wf, "%s\\%s : %s\n", directoryname, file_data.cFileName, "clean");
-		printf("%s\\%s : %s\n", directoryname, file_data.cFileName, "clean");
+		status |= write_in_file(&wf, "%s", "\nInvalid PE format.\n");
 	}
 
 	wf.buffer_written = BUFFER_SIZE;
-	write_in_file(TRUE, &wf, "%s", "");
+	write_in_file(&wf, "%s", "");
 
 	return status;
 }
 
-PE_STATUS thread_scan_file(THREAD_ITEM *thread_item)
+PE_STATUS thread_dump_file(THREAD_ITEM *thread_item)
 {
 	PE_STATUS status = PE_STATUS_SUCCESS;
 	WIN32_FIND_DATA file_data;
 	char file_to_read[MAX_PATH] = { 0 };
+	HANDLE write_file;
 
 	strcpy_s(file_to_read, MAX_PATH, thread_item->directoryname);
 	path_append(file_to_read, MAX_PATH, thread_item->file_data.cFileName);
@@ -567,13 +549,13 @@ PE_STATUS thread_scan_file(THREAD_ITEM *thread_item)
 		NULL
 	);
 
+	FindClose(FindFirstFile(file_to_read, &file_data)); //get_file_data
+
 	if (read_file == INVALID_HANDLE_VALUE)
 	{
 		status |= PE_STATUS_COULD_NOT_OPEN_FILE;
 		goto cleanup;
 	}
-
-	FindClose(FindFirstFile(file_to_read, &file_data)); //get_file_data
 
 	LPVOID mapped_data = map_file_read(read_file);
 
@@ -583,7 +565,25 @@ PE_STATUS thread_scan_file(THREAD_ITEM *thread_item)
 		goto cleanup;
 	}
 
-	status |= dump_file(mapped_data, file_data, thread_item->scan_file, thread_item->directoryname);
+	write_file = CreateFile(
+		thread_item->log_file,
+		GENERIC_WRITE,
+		FILE_SHARE_READ,
+		NULL,
+		CREATE_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+
+	printf("%s\n", thread_item->log_file);
+
+	if (write_file == INVALID_HANDLE_VALUE)
+	{
+		status |= PE_STATUS_COULD_NOT_CREATE_FILE;
+		goto cleanup;
+	}
+
+	status |= dump_file(mapped_data, file_data, write_file);
 
 cleanup:
 	if (!(status & PE_STATUS_COULD_NOT_OPEN_FILE))
@@ -596,11 +596,16 @@ cleanup:
 		UnmapViewOfFile(mapped_data);
 	}
 
+	if (!(status & PE_STATUS_COULD_NOT_CREATE_FILE))
+	{
+		CloseHandle(write_file);
+	}
+
 	return status;
 }
 
-PE_STATUS recurse_scan_current_directory_files(_In_ char filename[], _In_ TCHAR current_directory[],\
-	_In_ WIN32_FIND_DATA* file_data, _In_ BYTE no_threads, _In_ LIST_ENTRY *item_list, _In_ HANDLE* threads, _In_ HANDLE scan_file)
+PE_STATUS recurse_dump_current_directory_files(_In_ char filename[], _In_ TCHAR current_directory[],\
+	_In_ WIN32_FIND_DATA* file_data, _In_ BYTE no_threads, _In_ TCHAR log_directory[], _In_ LIST_ENTRY *item_list, _In_ HANDLE* threads)
 {
 	PE_STATUS status = PE_STATUS_SUCCESS;
 
@@ -621,7 +626,7 @@ PE_STATUS recurse_scan_current_directory_files(_In_ char filename[], _In_ TCHAR 
 			strcpy_s(foldername, MAX_PATH, current_directory);
 			path_append(foldername, MAX_PATH, file_data->cFileName);
 
-			scan_current_directory_files(filename, foldername, TRUE, no_threads, item_list, threads, scan_file);
+			dump_current_directory_files(filename, foldername, TRUE, no_threads, log_directory, item_list, threads);
 		}
 
 		next = FindNextFile(
@@ -635,8 +640,8 @@ PE_STATUS recurse_scan_current_directory_files(_In_ char filename[], _In_ TCHAR 
 	return status;
 }
 
-PE_STATUS scan_current_directory_files(_In_ char filename[], _In_ TCHAR current_directory[], _In_ BOOL recursive,\
-	_In_ BYTE no_threads, _In_ LIST_ENTRY *item_list, _In_ HANDLE* threads, _In_ HANDLE scan_file)
+PE_STATUS dump_current_directory_files(_In_ char filename[], _In_ TCHAR current_directory[], _In_ BOOL recursive,\
+	_In_ BYTE no_threads, _In_ TCHAR log_directory[], _In_ LIST_ENTRY *item_list, _In_ HANDLE* threads)
 {
 	PE_STATUS status = PE_STATUS_SUCCESS;
 
@@ -666,10 +671,22 @@ PE_STATUS scan_current_directory_files(_In_ char filename[], _In_ TCHAR current_
 				goto next;
 			}
 
+			TCHAR filename_abs_path[MAX_PATH];
+			strcpy_s(filename_abs_path, MAX_PATH, current_directory);
+			path_append(filename_abs_path, MAX_PATH, file_data.cFileName);
+			strcat_s(filename_abs_path, MAX_PATH, ".log");
+
+			TCHAR *filename_tmp = path_to_filename(filename_abs_path, MAX_PATH);
+
+			strcpy_s(filename_abs_path, MAX_PATH, log_directory);
+			path_append(filename_abs_path, MAX_PATH, filename_tmp);
+
+			free(filename_tmp);
+
 			THREAD_ITEM* thread_item;
 			thread_item = (THREAD_ITEM *)malloc(sizeof(THREAD_ITEM));
 
-			thread_item->scan_file = scan_file;
+			strcpy_s(thread_item->log_file, MAX_PATH, filename_abs_path);
 			strcpy_s(thread_item->directoryname, MAX_PATH, current_directory);
 			thread_item->file_data = file_data;
 			
@@ -688,7 +705,7 @@ PE_STATUS scan_current_directory_files(_In_ char filename[], _In_ TCHAR current_
 
 	if (recursive)
 	{
-		recurse_scan_current_directory_files(filename, current_directory, &file_data, no_threads, item_list, threads, scan_file);
+		recurse_dump_current_directory_files(filename, current_directory, &file_data, no_threads, log_directory, item_list, threads);
 	}
 
 	return PE_STATUS_SUCCESS;
@@ -722,7 +739,7 @@ DWORD WINAPI thread_dump(void* _item_list)
 
 		THREAD_ITEM* p = CONTAINING_RECORD(l, THREAD_ITEM, list_entry);
 
-		thread_scan_file(p);
+		thread_dump_file(p);
 
 		free(p);
 

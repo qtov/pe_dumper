@@ -206,69 +206,66 @@ TCHAR* path_to_filename(_In_ TCHAR* pathname, _In_ DWORD length)
 	return new_str;
 }
 
-PE_STATUS write_in_file(_In_ BOOL bool_write, _Inout_ WRITE_FILE_INFO* wf, _In_ char format[], ...)
+PE_STATUS write_in_file(_Inout_ WRITE_FILE_INFO* wf, _In_ char format[], ...)
 {
-	if (bool_write)
+	char buf[WRITE_IN_FILE_BUF_SIZE] = { 0 };
+	BOOL write_file;
+	va_list args;
+	va_start(args, format);
+
+	int bytes_written = vsnprintf_s(buf, WRITE_IN_FILE_BUF_SIZE, WRITE_IN_FILE_BUF_SIZE, format, args);
+
+	if (bytes_written + wf->buffer_written > BUFFER_SIZE)
 	{
-		char buf[WRITE_IN_FILE_BUF_SIZE] = { 0 };
-		BOOL write_file;
-		va_list args;
-		va_start(args, format);
+		write_file = WriteFile(
+			wf->file,
+			wf->buffer,
+			strlen(wf->buffer),
+			NULL,
+			NULL
+		);
 
-		int bytes_written = vsnprintf_s(buf, WRITE_IN_FILE_BUF_SIZE, WRITE_IN_FILE_BUF_SIZE, format, args);
-
-		if (bytes_written + wf->buffer_written > BUFFER_SIZE)
+		if (!write_file)
 		{
-			write_file = WriteFile(
-				wf->file,
-				wf->buffer,
-				strlen(wf->buffer),
-				NULL,
-				NULL
-			);
-
-			if (!write_file)
-			{
-				return PE_STATUS_COULD_NOT_WRITE_IN_FILE;
-			}
-
-			wf->buffer_written = 0;
+			return PE_STATUS_COULD_NOT_WRITE_IN_FILE;
 		}
 
-		if (wf->buffer_written == 0)
+		wf->buffer_written = 0;
+	}
+
+	if (wf->buffer_written == 0)
+	{
+		strcpy_s(wf->buffer, BUFFER_SIZE, buf);
+	}
+	else if (wf->buffer_written < 4000)
+	{
+		strcat_s(wf->buffer, BUFFER_SIZE, buf);
+	}
+	else
+	{
+		strcat_s(wf->buffer, BUFFER_SIZE, buf);
+
+		write_file = WriteFile(
+			wf->file,
+			wf->buffer,
+			strlen(wf->buffer),
+			NULL,
+			NULL
+		);
+
+		wf->buffer_written = 0;
+
+		if (write_file)
 		{
-			strcpy_s(wf->buffer, BUFFER_SIZE, buf);
-		}
-		else if (wf->buffer_written < 4000)
-		{
-			strcat_s(wf->buffer, BUFFER_SIZE, buf);
+			return PE_STATUS_SUCCESS;
 		}
 		else
 		{
-			strcat_s(wf->buffer, BUFFER_SIZE, buf);
-
-			write_file = WriteFile(
-				wf->file,
-				wf->buffer,
-				strlen(wf->buffer),
-				NULL,
-				NULL
-			);
-
-			wf->buffer_written = 0;
-
-			if (write_file)
-			{
-				return PE_STATUS_SUCCESS;
-			}
-			else
-			{
-				return PE_STATUS_COULD_NOT_WRITE_IN_FILE;
-			}
+			return PE_STATUS_COULD_NOT_WRITE_IN_FILE;
 		}
-
-		wf->buffer_written += bytes_written;
 	}
+
+	wf->buffer_written += bytes_written;
 
 	return PE_STATUS_SUCCESS;
 }

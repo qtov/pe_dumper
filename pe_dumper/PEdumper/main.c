@@ -47,7 +47,6 @@ int main(int argc, char* argv[])
 	BYTE no_threads = 8;
 
 	HANDLE* threads = NULL;
-	HANDLE scan_file = NULL;
 
 	PLIST_ENTRY item_list = (LIST_ENTRY *)malloc(sizeof(LIST_ENTRY));
 	InitializeListHead(item_list);
@@ -63,31 +62,13 @@ int main(int argc, char* argv[])
 	finished = FALSE;
 	found_file = FALSE;
 
-	TCHAR log_file[MAX_PATH] = { 0 };
+	TCHAR log_directory[MAX_PATH] = { 0 };
 	TCHAR current_directory[MAX_PATH] = { 0 };
 	TCHAR file_name[MAX_PATH] = { 0 };
 
-	GetCurrentDirectory(MAX_PATH, log_file);
+	GetCurrentDirectory(MAX_PATH, log_directory);
 
-	PE_CHECK(path_append(log_file, MAX_PATH, "logs"));
-
-	PE_CHECK(path_append(log_file, MAX_PATH, "scan.results"));
-
-	scan_file = CreateFile(
-		log_file,
-		GENERIC_WRITE,
-		FILE_SHARE_READ,
-		NULL,
-		CREATE_ALWAYS,
-		FILE_ATTRIBUTE_NORMAL,
-		NULL
-	);
-
-	if (scan_file == INVALID_HANDLE_VALUE)
-	{
-		status = PE_STATUS_COULD_NOT_CREATE_FILE;
-		goto cleanup;
-	}
+	PE_CHECK(path_append(log_directory, MAX_PATH, "logs"));
 
 	PE_CHECK(get_directory_name(current_directory, argv[1]));
 
@@ -99,7 +80,7 @@ int main(int argc, char* argv[])
 	{
 		PE_CHECK(initialize_threads(&threads, no_threads, item_list));
 
-		scan_current_directory_files(file_name, current_directory, rec, no_threads, item_list, threads, scan_file);
+		dump_current_directory_files(file_name, current_directory, rec, no_threads, log_directory, item_list, threads);
 	}
 	else
 	{
@@ -114,7 +95,7 @@ int main(int argc, char* argv[])
 			{
 				PE_CHECK(initialize_threads(&threads, no_threads, item_list));
 
-				scan_current_directory_files(file_name, current_directory, rec, no_threads, item_list, threads, scan_file);
+				dump_current_directory_files(file_name, current_directory, rec, no_threads, log_directory, item_list, threads);
 			}
 			else
 			{
@@ -129,7 +110,7 @@ int main(int argc, char* argv[])
 
 				PE_CHECK(initialize_threads(&threads, no_threads, item_list));
 
-				scan_current_directory_files(file_name, current_directory, rec, no_threads, item_list, threads, scan_file);
+				dump_current_directory_files(file_name, current_directory, rec, no_threads, log_directory, item_list, threads);
 			}
 		}
 		else
@@ -145,7 +126,7 @@ int main(int argc, char* argv[])
 
 			PE_CHECK(initialize_threads(&threads, no_threads, item_list));
 
-			scan_current_directory_files(file_name, current_directory, rec, no_threads, item_list, threads, scan_file);
+			dump_current_directory_files(file_name, current_directory, rec, no_threads, log_directory, item_list, threads);
 		}
 	}
 
@@ -177,11 +158,6 @@ int main(int argc, char* argv[])
 	free(threads);
 
 cleanup:
-	if (!(status & PE_STATUS_COULD_NOT_CREATE_FILE))
-	{
-		CloseHandle(scan_file);
-	}
-
 	if (status & PE_STATUS_WRONG_ARGUMENT_COUNT)
 	{
 		printf("Invalid number of arguments.\n%s <argument 1> [r] [number_of_threads]\n", argv[0]);

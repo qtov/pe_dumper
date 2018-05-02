@@ -6,7 +6,7 @@ typedef struct
 {
 	WIN32_FIND_DATA file_data;
 	char directoryname[MAX_PATH];
-	HANDLE scan_file;
+	char log_file[MAX_PATH];
 
 	LIST_ENTRY list_entry;
 } THREAD_ITEM;
