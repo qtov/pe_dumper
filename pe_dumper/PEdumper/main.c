@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
 	PLIST_ENTRY item_list = (LIST_ENTRY *)malloc(sizeof(LIST_ENTRY));
 	InitializeListHead(item_list);
 	
-	if (argc < 2 && argc > 4)
+	if (argc < 2 || argc > 4)
 	{
 		status = PE_STATUS_WRONG_ARGUMENT_COUNT;
 		goto cleanup;
